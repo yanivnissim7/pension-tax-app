@@ -58,7 +58,7 @@ def generate_pdf_report(data_dict):
     # כותרת
     pdf.cell(0, 5, txt=f"{datetime.now().strftime('%d/%m/%Y')} :{hb('תאריך פלט')}", ln=True, align='L')
     if os.path.exists(font_bold): pdf.set_font("ArialHeb", style="B", size=22)
-    pdf.set_text_color(0, 51, 102) # כחול כהה מקצועי
+    pdf.set_text_color(0, 51, 102) 
     pdf.cell(0, 15, txt=hb("דוח סימולציה - אופטימיזציית פריסה"), ln=True, align='C')
     pdf.set_text_color(0, 0, 0)
     
@@ -87,31 +87,31 @@ def generate_pdf_report(data_dict):
     # טבלה
     pdf.ln(5)
     if os.path.exists(font_bold): pdf.set_font("ArialHeb", style="B", size=11)
-    pdf.cell(45, 10, hb("מס שנתי"), border=1, align='C')
-    pdf.cell(45, 10, hb("הכנסה שנתית"), border=1, align='C')
-    pdf.cell(45, 10, hb("חלק מענק"), border=1, align='C')
+    # כותרות הטבלה (מימין לשמאל)
     pdf.cell(25, 10, hb("שנה"), border=1, align='C')
+    pdf.cell(45, 10, hb("חלק מענק"), border=1, align='C')
+    pdf.cell(45, 10, hb("הכנסה שנתית"), border=1, align='C')
+    pdf.cell(45, 10, hb("מס שנתי"), border=1, align='C')
     pdf.ln()
     
     if os.path.exists(font_reg): pdf.set_font("ArialHeb", size=10)
     for row in data_dict['table']:
-        pdf.cell(45, 8, f"{hb('ש''ח')} {row['מס']}", border=1, align='C')
-        pdf.cell(45, 8, f"{hb('ש''ח')} {row['הכנסה שנתית']}", border=1, align='C')
+        pdf.cell(25, 8, row['שנה'], border=1, align='C') # כאן הורדנו את ה-hb כדי שהשנה לא תתהפך
         pdf.cell(45, 8, f"{hb('ש''ח')} {row['חלק המענק']}", border=1, align='C')
-        pdf.cell(25, 8, hb(row['שנה']), border=1, align='C')
+        pdf.cell(45, 8, f"{hb('ש''ח')} {row['הכנסה שנתית']}", border=1, align='C')
+        pdf.cell(45, 8, f"{hb('ש''ח')} {row['מס']}", border=1, align='C')
         pdf.ln()
 
-    # --- חתימות ---
+    # חתימות
     pdf.ln(15)
-    pdf.cell(90, 10, hb("______________ :חתימת הסוכן"), align='R')
     pdf.cell(90, 10, hb("______________ :חתימת הלקוח"), align='R')
+    pdf.cell(90, 10, hb("______________ :חתימת הסוכן"), align='R')
 
-    # --- הבהרה משפטית מתוקנת ---
+    # הבהרה משפטית מתוקנת (ללא היפוך גורף של המשפט)
     pdf.set_y(-35)
     pdf.line(10, pdf.get_y(), 200, pdf.get_y())
     pdf.set_font("ArialHeb", size=8)
     
-    # הנוסח שביקשת
     line1 = "הבהרה משפטית: דוח זה מהווה סימולציה ראשונית בלבד ואינו מהווה ייעוץ מס או פנסיוני מחייב."
     line2 = "הנתונים הסופיים ייקבעו על ידי רשויות המס בלבד. מומלץ לבחון כל מקרה לגופו עם איש מקצוע מוסמך לפני קבלת החלטות."
     
