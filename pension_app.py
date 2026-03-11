@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from fpdf import FPDF
 import os
-from datetime import datetime, date
+from datetime import datetime
 
 # --- 1. אבטחה ---
 def check_password():
