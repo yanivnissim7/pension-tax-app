@@ -37,28 +37,30 @@ def calculate_tax_detailed(annual_income, points=2.25):
 def fmt_num(num):
     return f"{float(num):,.0f}"
 
-# --- 3. יצירת PDF (גרסת fpdf2 עם Unicode) ---
+# --- 3. יצירת PDF (גרסת fpdf2 עם תמיכה ביוניקוד) ---
 def generate_pdf_report(data_dict, table_rows):
-    # הגדרת PDF תומך יוניקוד
+    # יצירת אובייקט PDF עם תמיכה ביוניקוד
     pdf = FPDF()
     pdf.add_page()
     
-    # נתיב לפונטים
+    # טעינת פונטים (וודא שהם קיימים ב-GitHub באותיות קטנות)
     font_path = "arial.ttf"
     font_bold_path = "arialbd.ttf"
 
     if not os.path.exists(font_path):
-        raise FileNotFoundError("קבצי הפונטים arial.ttf ו-arialbd.ttf חסרים ב-GitHub!")
+        raise FileNotFoundError("קבצי הפונטים arial.ttf ו-arialbd.ttf חסרים בשרת!")
 
-    # הוספת הפונטים עם תמיכה ביוניקוד
     pdf.add_font("ArialHeb", style="", fname=font_path)
     pdf.add_font("ArialHeb", style="B", fname=font_bold_path)
+    
+    # הגדרת פונט ברירת מחדל
     pdf.set_font("ArialHeb", size=12)
 
-    # כותרת ותאריך (יישור לימין באמצעות align='R')
+    # תאריך (צד שמאל)
     pdf.set_font("ArialHeb", size=10)
     pdf.cell(0, 5, txt=f"תאריך פלט: {datetime.now().strftime('%d/%m/%Y')}", ln=True, align='L')
     
+    # כותרת ראשית
     pdf.set_font("ArialHeb", style="B", size=22)
     pdf.set_text_color(0, 51, 102) 
     pdf.cell(0, 15, txt="דוח סימולציה - אופטימיזציית פריסה", ln=True, align='C')
@@ -75,7 +77,7 @@ def generate_pdf_report(data_dict, table_rows):
     pdf.ln(5)
     pdf.cell(0, 9, txt=f"מענק ברוטו: {fmt_num(data_dict['total_grant'])} ש''ח", ln=True, align='R')
     pdf.cell(0, 9, txt=f"מתוכו פטור: {fmt_num(data_dict['exempt'])} ש''ח", ln=True, align='R')
-    pdf.cell(0, 9, txt=f"סך המס לתשלום (בפריסה): {fmt_num(data_dict['tax_with_spread'])} ש''ח", ln=True, align='R')
+    pdf.cell(0, 9, txt=f"סך המס לתשלום בפריסה: {fmt_num(data_dict['tax_with_spread'])} ש''ח", ln=True, align='R')
     
     pdf.ln(3)
     pdf.set_fill_color(230, 242, 255)
@@ -91,9 +93,9 @@ def generate_pdf_report(data_dict, table_rows):
     pdf.ln(8)
     pdf.set_text_color(0, 0, 0)
     pdf.set_font("ArialHeb", style="B", size=10)
-    # עמודות (בסדר הפוך ליישור עברית)
+    # עמודות (מימין לשמאל)
     pdf.cell(35, 10, "נטו שנתית", border=1, align='C')
-    pdf.cell(35, 10, "מס", border=1, align='C')
+    pdf.cell(35, 10, "מס שנתי", border=1, align='C')
     pdf.cell(45, 10, "הכנסה שנתית", border=1, align='C')
     pdf.cell(45, 10, "חלק מענק", border=1, align='C')
     pdf.cell(20, 10, "שנה", border=1, align='C')
@@ -101,10 +103,10 @@ def generate_pdf_report(data_dict, table_rows):
     
     pdf.set_font("ArialHeb", size=9)
     for row in table_rows:
-        pdf.cell(35, 8, f"{row['נטו']} ש''ח", border=1, align='C')
-        pdf.cell(35, 8, f"{row['מס']} ש''ח", border=1, align='C')
-        pdf.cell(45, 8, f"{row['הכנסה שנתית']} ש''ח", border=1, align='C')
-        pdf.cell(45, 8, f"{row['חלק המענק']} ש''ח", border=1, align='C')
+        pdf.cell(35, 8, f"{row['נטו']}", border=1, align='C')
+        pdf.cell(35, 8, f"{row['מס']}", border=1, align='C')
+        pdf.cell(45, 8, f"{row['הכנסה שנתית']}", border=1, align='C')
+        pdf.cell(45, 8, f"{row['חלק המענק']}", border=1, align='C')
         pdf.cell(20, 8, str(row['שנה']), border=1, align='C')
         pdf.ln()
 
@@ -147,6 +149,7 @@ def main():
         strategy = st.radio("סוג פריסה", ["פריסה קדימה", "פריסה אחורה"])
         num_years = st.slider("שנות פריסה", 1, 6, 6)
 
+    # לוגיקת חישוב
     tax_no_spread = calculate_tax_detailed(inc_now + taxable_val, points) - calculate_tax_detailed(inc_now, points)
     annual_part = taxable_val / num_years
     total_tax_spread, table_data = 0, []
@@ -178,8 +181,8 @@ def main():
             'savings': savings, 'net_total': net_total
         }
         try:
-            pdf_output = generate_pdf_report(pdf_data, table_data)
-            st.download_button("📥 הורד דוח סופי", data=bytes(pdf_output), file_name=f"Tax_Plan_{client_name}.pdf", mime="application/pdf")
+            pdf_bytes = generate_pdf_report(pdf_data, table_data)
+            st.download_button("📥 הורד דוח סופי", data=bytes(pdf_bytes), file_name=f"Tax_Plan_{client_name}.pdf", mime="application/pdf")
         except Exception as e:
             st.error(f"שגיאה בהפקת ה-PDF: {e}")
 
