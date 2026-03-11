@@ -45,13 +45,15 @@ def generate_pdf_report(data_dict):
     pdf = FPDF()
     pdf.add_page()
     
-    # בדיקת קיום פונטים
-    font_reg, font_bold = "arial.ttf", "arialbd.ttf"
-    if not os.path.exists(font_reg) or not os.path.exists(font_bold):
-        raise FileNotFoundError("קבצי הפונטים חסרים בשרת. וודא ש-arial.ttf ו-arialbd.ttf נמצאים ב-GitHub.")
+    # חיפוש גמיש של הפונטים (קטן/גדול)
+    reg_font = next((f for f in os.listdir('.') if f.lower() == 'arial.ttf'), None)
+    bold_font = next((f for f in os.listdir('.') if f.lower() == 'arialbd.ttf'), None)
 
-    pdf.add_font("ArialHeb", style="", fname=font_reg)
-    pdf.add_font("ArialHeb", style="B", fname=font_bold)
+    if not reg_font or not bold_font:
+        raise FileNotFoundError(f"Missing fonts! Make sure arial.ttf and arialbd.ttf are in GitHub. Found: {os.listdir('.')}")
+
+    pdf.add_font("ArialHeb", style="", fname=reg_font)
+    pdf.add_font("ArialHeb", style="B", fname=bold_font)
     
     # תאריך וכותרת
     pdf.set_font("ArialHeb", size=10)
@@ -172,7 +174,7 @@ def main():
             pdf_bytes = generate_pdf_report(pdf_data)
             st.download_button("📥 הורד דוח סופי", data=pdf_bytes, file_name=f"Tax_Plan_{client_name}.pdf")
         except Exception as e:
-            st.error(f"שגיאה: {e}. וודא שקבצי הפונטים נמצאים ב-GitHub.")
+            st.error(f"שגיאה: {e}")
 
 if __name__ == "__main__":
     main()
