@@ -45,15 +45,20 @@ def generate_pdf_report(data_dict):
     pdf = FPDF()
     pdf.add_page()
     
-    # חיפוש גמיש של הפונטים (קטן/גדול)
-    reg_font = next((f for f in os.listdir('.') if f.lower() == 'arial.ttf'), None)
-    bold_font = next((f for f in os.listdir('.') if f.lower() == 'arialbd.ttf'), None)
+    # הגדרת נתיב לפונטים
+    base_path = os.path.dirname(__file__)
+    font_path = os.path.join(base_path, "arial.ttf")
+    font_bold_path = os.path.join(base_path, "arialbd.ttf")
 
-    if not reg_font or not bold_font:
-        raise FileNotFoundError(f"Missing fonts! Make sure arial.ttf and arialbd.ttf are in GitHub. Found: {os.listdir('.')}")
+    if not os.path.exists(font_path) or not os.path.exists(font_bold_path):
+        # ניסיון אחרון למצוא אותם בתיקייה הנוכחית
+        font_path = "arial.ttf"
+        font_bold_path = "arialbd.ttf"
+        if not os.path.exists(font_path):
+            raise FileNotFoundError(f"הפונטים arial.ttf ו-arialbd.ttf חסרים בשרת.")
 
-    pdf.add_font("ArialHeb", style="", fname=reg_font)
-    pdf.add_font("ArialHeb", style="B", fname=bold_font)
+    pdf.add_font("ArialHeb", style="", fname=font_path)
+    pdf.add_font("ArialHeb", style="B", fname=font_bold_path)
     
     # תאריך וכותרת
     pdf.set_font("ArialHeb", size=10)
@@ -98,7 +103,7 @@ def generate_pdf_report(data_dict):
     pdf.ln()
     
     pdf.set_font("ArialHeb", size=9)
-    for row in data_dict['table']:
+    for row in table_data_global:
         pdf.cell(35, 8, f"{hb('ש''ח')} {row['נטו']}", border=1, align='C')
         pdf.cell(35, 8, f"{hb('ש''ח')} {row['מס']}", border=1, align='C')
         pdf.cell(45, 8, f"{hb('ש''ח')} {row['הכנסה שנתית']}", border=1, align='C')
@@ -149,12 +154,14 @@ def main():
     annual_part = taxable_val / num_years
     total_tax_spread, table_data = 0, []
     
+    global table_data_global
     for i in range(num_years):
         y = curr_yr + i if strategy == "פריסה קדימה" else curr_yr - i
         inc = inc_now if y == curr_yr else inc_future_mo * 12
         t = calculate_tax_detailed(inc + annual_part, points) - calculate_tax_detailed(inc, points)
         total_tax_spread += t
         table_data.append({"שנה": str(y), "חלק המענק": fmt_num(annual_part), "הכנסה שנתית": fmt_num(inc), "מס": fmt_num(t), "נטו": fmt_num(annual_part - t)})
+    table_data_global = table_data
 
     savings = tax_no_spread - total_tax_spread
     net_total = total_grant - total_tax_spread
@@ -169,12 +176,12 @@ def main():
     st.table(pd.DataFrame(table_data))
 
     if st.button("📄 הפק דוח PDF"):
-        pdf_data = {'agent_name': agent_name, 'client_name': client_name, 'client_id': client_id, 'total_grant': total_grant, 'exempt': exempt_val, 'taxable': taxable_val, 'tax_with_spread': total_tax_spread, 'tax_no_spread': tax_no_spread, 'savings': savings, 'net_total': net_total, 'table': table_data}
+        pdf_data = {'agent_name': agent_name, 'client_name': client_name, 'client_id': client_id, 'total_grant': total_grant, 'exempt': exempt_val, 'taxable': taxable_val, 'tax_with_spread': total_tax_spread, 'tax_no_spread': tax_no_spread, 'savings': savings, 'net_total': net_total}
         try:
             pdf_bytes = generate_pdf_report(pdf_data)
             st.download_button("📥 הורד דוח סופי", data=pdf_bytes, file_name=f"Tax_Plan_{client_name}.pdf")
         except Exception as e:
-            st.error(f"שגיאה: {e}")
+            st.error(f"שגיאה בהפקת ה-PDF: {e}")
 
 if __name__ == "__main__":
     main()
