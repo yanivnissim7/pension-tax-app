@@ -23,7 +23,6 @@ def check_password():
 
 # --- 2. מנוע חישוב מס ---
 def calculate_tax_detailed(annual_income, points=2.25):
-    # מדרגות מס מעודכנות
     brackets = [(84120, 0.10), (120720, 0.14), (193800, 0.20), (269280, 0.31), (560280, 0.35), (721560, 0.47), (float('inf'), 0.50)]
     tax, prev_limit = 0, 0
     for limit, rate in brackets:
@@ -63,7 +62,7 @@ def run_spread_calc(start_year, num_years, taxable_val, inc_now, inc_future_mo, 
         })
     return total_tax, details
 
-# --- 4. יצירת דוח PDF (מעודכן עם פטור/חייב) ---
+# --- 4. יצירת דוח PDF (מתוקן - השנה לא הפוכה) ---
 def generate_pdf_report(data_dict):
     pdf = FPDF()
     pdf.add_page()
@@ -71,7 +70,7 @@ def generate_pdf_report(data_dict):
     pdf.add_font("ArialHeb", style="B", fname="arialbd.ttf")
     pdf.set_font("ArialHeb", size=10)
 
-    # כותרת ותאריך הפקה
+    # כותרת ותאריך
     pdf.cell(0, 5, txt=f"{datetime.now().strftime('%d/%m/%Y')} :{hb('תאריך פלט')}", ln=True, align='L')
     pdf.set_font("ArialHeb", style="B", size=20)
     pdf.cell(0, 15, txt=hb("דוח אופטימיזציית פריסת מענקים"), ln=True, align='C')
@@ -84,17 +83,17 @@ def generate_pdf_report(data_dict):
     pdf.line(10, pdf.get_y(), 200, pdf.get_y())
     pdf.ln(5)
 
-    # נתונים כספיים - הוספת השורות שביקשת
+    # נתונים כספיים
     pdf.set_font("ArialHeb", size=11)
     pdf.cell(0, 8, txt=f"{hb('שח')} {fmt_num(data_dict['total_grant'])} :{hb('מענק ברוטו כולל')}", ln=True, align='R')
-    pdf.set_text_color(0, 100, 0) # צבע ירוק כהה לפטור
+    pdf.set_text_color(0, 100, 0)
     pdf.cell(0, 8, txt=f"{hb('שח')} {fmt_num(data_dict['exempt'])} :{hb('מענק פטור ממס')}", ln=True, align='R')
-    pdf.set_text_color(150, 0, 0) # צבע אדום לחייב
+    pdf.set_text_color(150, 0, 0)
     pdf.cell(0, 8, txt=f"{hb('שח')} {fmt_num(data_dict['taxable'])} :{hb('מענק חייב במס (לפריסה)')}", ln=True, align='R')
-    pdf.set_text_color(0, 0, 0) # חזרה לשחור
+    pdf.set_text_color(0, 0, 0)
     pdf.cell(0, 8, txt=f"{hb('שח')} {fmt_num(data_dict['savings'])} :{hb('חיסכון מס משוער בפריסה')}", ln=True, align='R')
     
-    # שורת הנטו המודגשת
+    # שורת הנטו
     pdf.ln(4)
     pdf.set_fill_color(220, 255, 220)
     pdf.set_font("ArialHeb", style="B", size=14)
@@ -116,7 +115,8 @@ def generate_pdf_report(data_dict):
         pdf.cell(45, 8, f"{row['מס']}", border=1, align='C')
         pdf.cell(45, 8, f"{row['הכנסה שנתית']}", border=1, align='C')
         pdf.cell(45, 8, f"{row['חלק המענק']}", border=1, align='C')
-        pdf.cell(25, 8, hb(row['שנה']), border=1, align='C')
+        # התיקון כאן: לא משתמשים ב-hb על השנה
+        pdf.cell(25, 8, row['שנה'], border=1, align='C')
         pdf.ln()
 
     # חתימות
@@ -145,7 +145,6 @@ def main():
         seniority = st.number_input("שנות וותק", value=12.0)
         salary_for_exempt = st.number_input("שכר קובע", value=13750)
         
-        # חישוב פטור
         exempt_val = min(total_grant, seniority * min(salary_for_exempt, 13750))
         taxable_val = total_grant - exempt_val
         
@@ -155,14 +154,12 @@ def main():
         inc_future_mo = st.number_input("הכנסה חודשית עתידית צפויה", value=7000)
         num_years = st.slider("שנות פריסה", 1, 6, 6)
 
-    # חישוב השוואתי
     this_year = 2026
     tax_now, table_now = run_spread_calc(this_year, num_years, taxable_val, inc_now, inc_future_mo, points)
     tax_next, table_next = run_spread_calc(this_year + 1, num_years, taxable_val, inc_now, inc_future_mo, points)
     
     tax_no_spread = (calculate_tax_detailed(inc_now + taxable_val, points) - calculate_tax_detailed(inc_now, points))
     
-    # הצגת המלצה
     diff = tax_now - tax_next
     if diff > 100:
         st.success(f"💡 המלצה מקצועית: עדיף להתחיל פריסה מ-{this_year + 1}. חיסכון נוסף של ₪{fmt_num(diff)}")
@@ -186,7 +183,7 @@ def main():
         pdf_data = {
             'agent_name': agent_name, 'client_name': client_name, 'client_id': client_id, 
             'ret_date': ret_date.strftime('%d/%m/%Y'), 'total_grant': total_grant, 
-            'exempt': exempt_val, 'taxable': taxable_val, # הוספנו את המפתחות האלו
+            'exempt': exempt_val, 'taxable': taxable_val,
             'tax_with_spread': final_tax, 'savings': savings, 'table': final_table
         }
         try:
