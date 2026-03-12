@@ -14,7 +14,7 @@ def check_password():
     st.markdown("<h2 style='text-align: right;'>כניסה למערכת מוגנת</h2>", unsafe_allow_html=True)
     password = st.text_input("הזן קוד גישה", type="password")
     if st.button("התחבר"):
-        if password == "1234": # <--- כאן שנה את הסיסמה שלך!
+        if password == "1234":
             st.session_state["password_correct"] = True
             st.rerun()
         else:
@@ -35,29 +35,39 @@ def calculate_tax_detailed(annual_income, points=2.25):
     surtax = max(0, (annual_income - 721560) * 0.03)
     return max(0, (tax + surtax) - (points * 2904))
 
-def hb(text): return str(text)[::-1] if text else ""
-def fmt_num(num): return f"{float(num):,.0f}"
+def hb(text): 
+    if not text: return ""
+    return str(text)[::-1]
 
-# --- 3. יצירת PDF עם הערה משפטית ---
+def fmt_num(num): 
+    return f"{float(num):,.0f}"
+
+# --- 3. יצירת PDF ---
 def generate_pdf_report(data_dict):
     pdf = FPDF()
     pdf.add_page()
+    
     font_reg, font_bold = "arial.ttf", "arialbd.ttf"
     
-    if os.path.exists(font_reg) and os.path.exists(font_bold):
-        pdf.add_font("ArialHeb", style="", fname=font_reg)
-        pdf.add_font("ArialHeb", style="B", fname=font_bold)
-        pdf.set_font("ArialHeb", size=10)
-    else:
-        pdf.set_font("Helvetica", size=10)
+    # וידוא קיום פונטים - קריטי למניעת שגיאת Helvetica
+    if not os.path.exists(font_reg):
+        st.error(f"קובץ הפונט {font_reg} חסר בשרת! העלה אותו ל-GitHub.")
+        st.stop()
+
+    # טעינת הפונטים לתוך ה-PDF
+    pdf.add_font("ArialHeb", style="", fname=font_reg)
+    pdf.add_font("ArialHeb", style="B", fname=font_bold)
+    
+    # הגדרת פונט ברירת מחדל
+    pdf.set_font("ArialHeb", size=10)
 
     # כותרת ופרטים
     pdf.cell(0, 5, txt=f"{datetime.now().strftime('%d/%m/%Y')} :{hb('תאריך פלט')}", ln=True, align='L')
-    if os.path.exists(font_bold): pdf.set_font("ArialHeb", style="B", size=20)
+    pdf.set_font("ArialHeb", style="B", size=20)
     pdf.cell(0, 15, txt=hb("דוח סימולציה - אופטימיזציית פריסת מענקים"), ln=True, align='C')
     
     pdf.ln(5)
-    if os.path.exists(font_reg): pdf.set_font("ArialHeb", size=12)
+    pdf.set_font("ArialHeb", size=12)
     pdf.cell(0, 7, txt=hb(f"לקוח: {data_dict['client_name']} | ת.ז: {data_dict['client_id']}"), ln=True, align='R')
     pdf.cell(0, 7, txt=hb(f"סוכן מטפל: {data_dict['agent_name']}"), ln=True, align='R')
     pdf.ln(5)
@@ -65,40 +75,41 @@ def generate_pdf_report(data_dict):
     pdf.ln(5)
 
     # תוצאות
-    pdf.cell(0, 9, txt=f"{hb('ש''ח')} {fmt_num(data_dict['total_grant'])} :{hb('מענק ברוטו')}", ln=True, align='R')
-    pdf.cell(0, 9, txt=f"{hb('ש''ח')} {fmt_num(data_dict['exempt'])} :{hb('מתוכו פטור')}", ln=True, align='R')
-    pdf.cell(0, 9, txt=f"{hb('ש''ח')} {fmt_num(data_dict['taxable'])} :{hb('מתוכו חייב במס')}", ln=True, align='R')
+    pdf.cell(0, 9, txt=f"{hb('שח')} {fmt_num(data_dict['total_grant'])} :{hb('מענק ברוטו')}", ln=True, align='R')
+    pdf.cell(0, 9, txt=f"{hb('שח')} {fmt_num(data_dict['exempt'])} :{hb('מתוכו פטור')}", ln=True, align='R')
+    pdf.cell(0, 9, txt=f"{hb('שח')} {fmt_num(data_dict['taxable'])} :{hb('מתוכו חייב במס')}", ln=True, align='R')
     pdf.ln(2)
-    pdf.cell(0, 9, txt=f"{hb('ש''ח')} {fmt_num(data_dict['tax_no_spread'])} :{hb('מס מוערך ללא פריסה')}", ln=True, align='R')
+    pdf.cell(0, 9, txt=f"{hb('שח')} {fmt_num(data_dict['tax_no_spread'])} :{hb('מס מוערך ללא פריסה')}", ln=True, align='R')
     
-    if os.path.exists(font_bold): pdf.set_font("ArialHeb", style="B", size=14)
-    pdf.set_text_color(0, 128, 0) # צבע ירוק לחיסכון
-    pdf.cell(0, 10, txt=f"{hb('ש''ח')} {fmt_num(data_dict['savings'])} :{hb('חיסכון מס משוער בפריסה')}", ln=True, align='R')
+    pdf.set_font("ArialHeb", style="B", size=14)
+    pdf.set_text_color(0, 128, 0)
+    pdf.cell(0, 10, txt=f"{hb('שח')} {fmt_num(data_dict['savings'])} :{hb('חיסכון מס משוער בפריסה')}", ln=True, align='R')
     pdf.set_text_color(0, 0, 0)
 
     # טבלה
     pdf.ln(10)
+    pdf.set_font("ArialHeb", style="B", size=10)
     pdf.cell(45, 10, hb("מס שנתי"), border=1, align='C')
     pdf.cell(45, 10, hb("הכנסה שנתית"), border=1, align='C')
     pdf.cell(45, 10, hb("חלק מענק"), border=1, align='C')
     pdf.cell(25, 10, hb("שנה"), border=1, align='C')
     pdf.ln()
-    if os.path.exists(font_reg): pdf.set_font("ArialHeb", size=10)
+    
+    pdf.set_font("ArialHeb", size=10)
     for row in data_dict['table']:
-        pdf.cell(45, 8, f"{hb('ש''ח')} {row['מס']}", border=1, align='C')
-        pdf.cell(45, 8, f"{hb('ש''ח')} {row['הכנסה שנתית']}", border=1, align='C')
-        pdf.cell(45, 8, f"{hb('ש''ח')} {row['חלק המענק']}", border=1, align='C')
+        pdf.cell(45, 8, f"{hb('שח')} {row['מס']}", border=1, align='C')
+        pdf.cell(45, 8, f"{hb('שח')} {row['הכנסה שנתית']}", border=1, align='C')
+        pdf.cell(45, 8, f"{hb('שח')} {row['חלק המענק']}", border=1, align='C')
         pdf.cell(25, 8, hb(row['שנה']), border=1, align='C')
         pdf.ln()
 
-    # --- הוספת הערה משפטית בתחתית ---
     pdf.set_y(-40)
     pdf.line(10, pdf.get_y(), 200, pdf.get_y())
     pdf.set_font("ArialHeb", size=8)
-    disclaimer = "הבהרה משפטית: דוח זה מהווה סימולציה ראשונית בלבד ואינו מהווה ייעוץ מס או פנסיוני מחייב. הנתונים הסופיים ייקבעו על ידי רשויות המס בלבד. מומלץ לבחון כל מקרה לגופו עם איש מקצוע מוסמך לפני קבלת החלטות."
+    disclaimer = "הבהרה משפטית: דוח זה מהווה סימולציה ראשונית בלבד ואינו מהווה ייעוץ מס או פנסיוני מחייב. הנתונים הסופיים ייקבעו על ידי רשויות המס בלבד."
     pdf.multi_cell(0, 5, txt=hb(disclaimer), align='R')
     
-    return bytes(pdf.output())
+    return pdf.output(dest='S').encode('latin-1', 'ignore')
 
 # --- 4. ממשק האפליקציה ---
 def main():
@@ -109,7 +120,6 @@ def main():
 
     st.markdown("<h1 style='text-align: right;'>📊 סימולטור פריסה מקצועי</h1>", unsafe_allow_html=True)
     
-    # (שאר הקוד של הממשק נשאר זהה...)
     with st.sidebar:
         agent_name = st.text_input("שם הסוכן", "יניב")
         client_name = st.text_input("שם הלקוח", "ישראל ישראלי")
@@ -128,7 +138,7 @@ def main():
         strategy = st.radio("סוג פריסה", ["פריסה קדימה", "פריסה אחורה"])
         num_years = st.slider("שנות פריסה", 1, 6, 6)
 
-    # חישובים מהירים להצגה
+    # חישובים
     tax_no_spread = calculate_tax_detailed(inc_now + taxable_val, points) - calculate_tax_detailed(inc_now, points)
     annual_part = taxable_val / num_years
     total_tax_spread, table_data = 0, []
@@ -141,9 +151,10 @@ def main():
 
     savings = tax_no_spread - total_tax_spread
 
-    st.columns(3)[0].metric("מס ללא פריסה", f"₪{fmt_num(tax_no_spread)}")
-    st.columns(3)[1].metric("מס בפריסה", f"₪{fmt_num(total_tax_spread)}")
-    st.columns(3)[2].metric("חיסכון", f"₪{fmt_num(savings)}", delta=f"{fmt_num(savings)}")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("מס ללא פריסה", f"₪{fmt_num(tax_no_spread)}")
+    col2.metric("מס בפריסה", f"₪{fmt_num(total_tax_spread)}")
+    col3.metric("חיסכון", f"₪{fmt_num(savings)}", delta=f"{fmt_num(savings)}")
     
     st.table(pd.DataFrame(table_data))
 
@@ -151,8 +162,16 @@ def main():
         pdf_data = {'agent_name': agent_name, 'client_name': client_name, 'client_id': client_id, 
                     'total_grant': total_grant, 'exempt': exempt_val, 'taxable': taxable_val, 
                     'tax_no_spread': tax_no_spread, 'savings': savings, 'table': table_data}
-        pdf_bytes = generate_pdf_report(pdf_data)
-        st.download_button("📥 הורד דוח", data=pdf_bytes, file_name=f"Tax_Plan_{client_name}.pdf")
+        try:
+            pdf_bytes = generate_pdf_report(pdf_data)
+            st.download_button(
+                label="📥 הורד דוח",
+                data=pdf_bytes,
+                file_name=f"Tax_Plan_{client_name}.pdf",
+                mime="application/pdf"
+            )
+        except Exception as e:
+            st.error(f"שגיאה בהפקה: {e}")
 
 if __name__ == "__main__":
     main()
