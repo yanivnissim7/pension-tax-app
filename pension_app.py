@@ -62,7 +62,7 @@ def run_spread_calc(start_year, num_years, taxable_val, inc_now, inc_future_mo, 
         })
     return total_tax, details
 
-# --- 4. יצירת דוח PDF (תיקון סוגריים וחתימת סוכן) ---
+# --- 4. יצירת דוח PDF (תיקון סוגריים בשורות נתונים וחתימה) ---
 def generate_pdf_report(data_dict):
     pdf = FPDF()
     pdf.add_page()
@@ -91,13 +91,15 @@ def generate_pdf_report(data_dict):
     pdf.line(15, pdf.get_y(), 195, pdf.get_y())
     pdf.ln(5)
 
-    # נתונים כספיים
+    # נתונים כספיים - תיקון סוגריים בשורה השלישית
     pdf.set_font("ArialHeb", size=11)
     pdf.cell(0, 8, txt=f"{hb('שח')} {fmt_num(data_dict['total_grant'])} :{hb('מענק ברוטו כולל')}", ln=True, align='R')
     pdf.set_text_color(0, 100, 0)
     pdf.cell(0, 8, txt=f"{hb('שח')} {fmt_num(data_dict['exempt'])} :{hb('מענק פטור ממס')}", ln=True, align='R')
     pdf.set_text_color(150, 0, 0)
-    pdf.cell(0, 8, txt=f"{hb('שח')} {fmt_num(data_dict['taxable'])} :{hb('מענק חייב במס (לפריסה)')}", ln=True, align='R')
+    # תיקון סוגריים במחרוזת "מענק חייב במס (לפריסה)"
+    taxable_label = "מענק חייב במס )לפריסה("
+    pdf.cell(0, 8, txt=f"{hb('שח')} {fmt_num(data_dict['taxable'])} :{hb(taxable_label)}", ln=True, align='R')
     pdf.set_text_color(0, 0, 0)
     pdf.cell(0, 8, txt=f"{hb('שח')} {fmt_num(data_dict['savings'])} :{hb('חיסכון מס משוער בפריסה')}", ln=True, align='R')
     
@@ -128,13 +130,12 @@ def generate_pdf_report(data_dict):
         pdf.cell(30, 8, row['שנה'], border=1, align='C')
         pdf.ln()
 
-    # --- הערה משפטית מתוקנת סוגריים ---
+    # --- הערה משפטית ---
     pdf.ln(10)
     pdf.set_font("ArialHeb", size=9)
     
     line1 = "הבהרה משפטית: דוח זה מהווה סימולציה ראשונית בלבד המבוססת על הנתונים שהוזנו ואינו מהווה ייעוץ מס מחייב."
     line2 = "החישוב מבוסס על ההנחה כי ההכנסה היחידה בשנות הפריסה היא הקצבה שהוזנה בסימולטור."
-    # הפיכת סוגריים במקור: )כגון... ( כדי שיצאו נכון אחרי hb
     line3 = "במידה ותהיה הכנסה נוספת מכל מקור שהוא )כגון שכר עבודה, עסק, שכירות וכיו''ב(, חבות המס השנתית תגדל בהתאם."
     line4 = "הנתונים הסופיים ייקבעו אך ורק על ידי רשויות המס בכפוף להגשת דוחות כחוק."
 
@@ -143,10 +144,10 @@ def generate_pdf_report(data_dict):
     pdf.cell(0, 6, txt=hb(line3), ln=True, align='R')
     pdf.cell(0, 6, txt=hb(line4), ln=True, align='R')
 
-    # חתימת סוכן
+    # חתימת סוכן מעודכנת
     pdf.ln(5)
     pdf.set_font("ArialHeb", style="B", size=10)
-    pdf.cell(0, 8, txt=f"{hb(data_dict['agent_name'])} : {hb('בברכה, סוכן מטפל')}", ln=True, align='R')
+    pdf.cell(0, 8, txt=f"{hb(data_dict['agent_name'])} : {hb('סוכן מטפל')}", ln=True, align='R')
 
     return bytes(pdf.output())
 
