@@ -62,7 +62,7 @@ def run_spread_calc(start_year, num_years, taxable_val, inc_now, inc_future_mo, 
         })
     return total_tax, details
 
-# --- 4. יצירת דוח PDF (מעודכן: בלי חתימות, עם הערה למטה) ---
+# --- 4. יצירת דוח PDF (מתוקן: תאריך ושנה לא הפוכים) ---
 def generate_pdf_report(data_dict):
     pdf = FPDF()
     pdf.add_page()
@@ -70,15 +70,20 @@ def generate_pdf_report(data_dict):
     pdf.add_font("ArialHeb", style="B", fname="arialbd.ttf")
     pdf.set_font("ArialHeb", size=10)
 
-    # כותרת ותאריך פלט
-    pdf.cell(0, 5, txt=f"{datetime.now().strftime('%d/%m/%Y')} :{hb('תאריך פלט')}", ln=True, align='L')
+    # תאריך פלט (התאריך של היום) - מוצג משמאל
+    today_str = datetime.now().strftime('%d/%m/%Y')
+    pdf.cell(0, 5, txt=f"{today_str} :{hb('תאריך פלט')}", ln=True, align='L')
+    
     pdf.set_font("ArialHeb", style="B", size=20)
     pdf.cell(0, 15, txt=hb("דוח אופטימיזציית פריסת מענקים"), ln=True, align='C')
     
     pdf.ln(5)
     pdf.set_font("ArialHeb", size=12)
     pdf.cell(0, 7, txt=hb(f"לקוח: {data_dict['client_name']} | ת.ז: {data_dict['client_id']}"), ln=True, align='R')
-    pdf.cell(0, 7, txt=hb(f"תאריך פרישה: {data_dict['ret_date']}"), ln=True, align='R')
+    
+    # התיקון כאן: תאריך הפרישה מוצג ללא hb
+    pdf.cell(0, 7, txt=f"{data_dict['ret_date']} :{hb('תאריך פרישה')}", ln=True, align='R')
+    
     pdf.ln(5)
     pdf.line(10, pdf.get_y(), 200, pdf.get_y())
     pdf.ln(5)
@@ -93,7 +98,7 @@ def generate_pdf_report(data_dict):
     pdf.set_text_color(0, 0, 0)
     pdf.cell(0, 8, txt=f"{hb('שח')} {fmt_num(data_dict['savings'])} :{hb('חיסכון מס משוער בפריסה')}", ln=True, align='R')
     
-    # שורת הנטו המודגשת
+    # שורת הנטו
     pdf.ln(4)
     pdf.set_fill_color(220, 255, 220)
     pdf.set_font("ArialHeb", style="B", size=14)
@@ -115,10 +120,10 @@ def generate_pdf_report(data_dict):
         pdf.cell(45, 8, f"{row['מס']}", border=1, align='C')
         pdf.cell(45, 8, f"{row['הכנסה שנתית']}", border=1, align='C')
         pdf.cell(45, 8, f"{row['חלק המענק']}", border=1, align='C')
-        pdf.cell(25, 8, row['שנה'], border=1, align='C')
+        pdf.cell(25, 8, row['שנה'], border=1, align='C') # ללא hb
         pdf.ln()
 
-    # הערה משפטית בתחתית העמוד (במקום חתימות)
+    # הערה משפטית
     pdf.set_y(-30)
     pdf.set_font("ArialHeb", size=8)
     disclaimer = "הבהרה: דוח זה מהווה סימולציה ראשונית בלבד ואינו מהווה ייעוץ מס מחייב. הנתונים הסופיים ייקבעו על ידי רשויות המס בכפוף להגשת דוחות והצהרות כחוק."
