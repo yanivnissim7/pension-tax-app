@@ -62,13 +62,15 @@ def run_spread_calc(start_year, num_years, taxable_val, inc_now, inc_future_mo, 
         })
     return total_tax, details
 
-# --- 4. יצירת דוח PDF (תיקון תחביר וסוגריים בהערה המשפטית) ---
+# --- 4. יצירת דוח PDF (תיקון סופי לשגיאת ה-Space) ---
 def generate_pdf_report(data_dict):
     pdf = FPDF()
     pdf.add_page()
     pdf.add_font("ArialHeb", style="", fname="arial.ttf")
     pdf.add_font("ArialHeb", style="B", fname="arialbd.ttf")
     
+    # שוליים קבועים
+    pdf.set_auto_page_break(auto=True, margin=15)
     pdf.set_right_margin(15)
     pdf.set_left_margin(15)
 
@@ -127,22 +129,20 @@ def generate_pdf_report(data_dict):
         pdf.cell(30, 8, row['שנה'], border=1, align='C')
         pdf.ln()
 
-    # --- תיקון הערה משפטית ---
+    # --- פתרון סופי להערה המשפטית ---
     pdf.ln(10)
     pdf.set_font("ArialHeb", size=9)
     
-    # הטקסט מסודר בצורה שתצא תקינה לאחר ההיפוך (hb)
-    p1 = "הבהרה משפטית: דוח זה מהווה סימולציה ראשונית בלבד המבוססת על הנתונים שהוזנו ואינו מהווה ייעוץ מס מחייב."
-    p2 = "החישוב מבוסס על ההנחה כי ההכנסה היחידה בשנות הפריסה היא הקצבה שהוזנה בסימולטור."
-    # כאן טיפלנו בסוגריים ע"י הפיכתם במקור כדי שייראו נכון ב-PDF
-    p3 = "במידה ותהיה הכנסה נוספת מכל מקור שהוא (כגון שכר עבודה, עסק, שכירות וכיו''ב), חבות המס השנתית תגדל בהתאם למדרגות המס הקבועות בחוק."
-    p4 = "הנתונים הסופיים ייקבעו אך ורק על ידי רשויות המס בכפוף להגשת דוחות כחוק."
+    # רשימת שורות קבועה למניעת שגיאות רוחב
+    disclaimer_lines = [
+        "הבהרה משפטית: דוח זה מהווה סימולציה ראשונית בלבד המבוססת על הנתונים שהוזנו ואינו מהווה ייעוץ מס מחייב.",
+        "החישוב מבוסס על ההנחה כי ההכנסה היחידה בשנות הפריסה היא הקצבה שהוזנה בסימולטור.",
+        "במידה ותהיה הכנסה נוספת מכל מקור שהוא (כגון שכר עבודה, עסק, שכירות וכיו''ב), חבות המס השנתית תגדל בהתאם.",
+        "הנתונים הסופיים ייקבעו אך ורק על ידי רשויות המס בכפוף להגשת דוחות כחוק."
+    ]
 
-    # הדפסה שורה-שורה למניעת בלבול תחבירי
-    pdf.multi_cell(0, 6, txt=hb(p1), align='R')
-    pdf.multi_cell(0, 6, txt=hb(p2), align='R')
-    pdf.multi_cell(0, 6, txt=hb(p3), align='R')
-    pdf.multi_cell(0, 6, txt=hb(p4), align='R')
+    for line in disclaimer_lines:
+        pdf.cell(0, 6, txt=hb(line), ln=True, align='R')
 
     return bytes(pdf.output())
 
