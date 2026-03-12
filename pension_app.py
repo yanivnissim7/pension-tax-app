@@ -45,6 +45,7 @@ def fmt_num(num):
 
 # --- 3. יצירת דוח PDF ---
 def generate_pdf_report(data_dict):
+    # יצירת אובייקט PDF (תומך fpdf2)
     pdf = FPDF()
     pdf.add_page()
     
@@ -113,7 +114,8 @@ def generate_pdf_report(data_dict):
     disclaimer = "הבהרה: דוח זה מהווה סימולציה ראשונית בלבד ואינו מהווה ייעוץ מס מחייב. הנתונים הסופיים ייקבעו על ידי רשויות המס."
     pdf.multi_cell(0, 5, txt=hb(disclaimer), align='R')
     
-    return pdf.output()
+    # התיקון הקריטי: המרה מ-bytearray ל-bytes עבור Streamlit
+    return bytes(pdf.output())
 
 # --- 4. ממשק המשתמש (Streamlit) ---
 def main():
@@ -154,7 +156,6 @@ def main():
     current_year = 2026
     for i in range(num_years):
         year = current_year + i if strategy == "פריסה קדימה" else current_year - i
-        # בשנה הראשונה ההכנסה היא הנוכחית, בשאר השנים ההכנסה העתידית
         annual_inc = inc_now if year == current_year else inc_future_mo * 12
         
         tax_on_income_only = calculate_tax_detailed(annual_inc, points)
@@ -190,15 +191,18 @@ def main():
             'savings': savings, 'table': table_data
         }
         try:
-            pdf_out = generate_pdf_report(pdf_data)
+            # הפקת ה-bytes מהפונקציה
+            pdf_bytes = generate_pdf_report(pdf_data)
+            
+            # הורדה ב-Streamlit
             st.download_button(
                 label="📥 הורד דוח PDF חתום",
-                data=pdf_out,
+                data=pdf_bytes,
                 file_name=f"Tax_Report_{client_name}.pdf",
                 mime="application/pdf"
             )
         except Exception as e:
-            st.error(f"שגיאה בהפקת הקובץ: {e}. וודא שקבצי הפונטים arial.ttf קיימים ב-GitHub.")
+            st.error(f"שגיאה בהפקת הקובץ: {e}")
 
 if __name__ == "__main__":
     main()
