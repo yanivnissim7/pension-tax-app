@@ -62,7 +62,7 @@ def run_spread_calc(start_year, num_years, taxable_val, inc_now, inc_future_mo, 
         })
     return total_tax, details
 
-# --- 4. יצירת דוח PDF (מעודכן: תאריך ושנה תקינים + הבהרה מורחבת) ---
+# --- 4. יצירת דוח PDF (תיקון שגיאת Space ורינדור הערות) ---
 def generate_pdf_report(data_dict):
     pdf = FPDF()
     pdf.add_page()
@@ -72,15 +72,15 @@ def generate_pdf_report(data_dict):
 
     # תאריך פלט
     today_str = datetime.now().strftime('%d/%m/%Y')
-    pdf.cell(0, 5, txt=f"{today_str} :{hb('תאריך פלט')}", ln=True, align='L')
+    pdf.cell(190, 5, txt=f"{today_str} :{hb('תאריך פלט')}", ln=True, align='L')
     
     pdf.set_font("ArialHeb", style="B", size=20)
-    pdf.cell(0, 15, txt=hb("דוח אופטימיזציית פריסת מענקים"), ln=True, align='C')
+    pdf.cell(190, 15, txt=hb("דוח אופטימיזציית פריסת מענקים"), ln=True, align='C')
     
     pdf.ln(5)
     pdf.set_font("ArialHeb", size=12)
-    pdf.cell(0, 7, txt=hb(f"לקוח: {data_dict['client_name']} | ת.ז: {data_dict['client_id']}"), ln=True, align='R')
-    pdf.cell(0, 7, txt=f"{data_dict['ret_date']} :{hb('תאריך פרישה')}", ln=True, align='R')
+    pdf.cell(190, 7, txt=hb(f"לקוח: {data_dict['client_name']} | ת.ז: {data_dict['client_id']}"), ln=True, align='R')
+    pdf.cell(190, 7, txt=f"{data_dict['ret_date']} :{hb('תאריך פרישה')}", ln=True, align='R')
     
     pdf.ln(5)
     pdf.line(10, pdf.get_y(), 200, pdf.get_y())
@@ -88,25 +88,27 @@ def generate_pdf_report(data_dict):
 
     # נתונים כספיים
     pdf.set_font("ArialHeb", size=11)
-    pdf.cell(0, 8, txt=f"{hb('שח')} {fmt_num(data_dict['total_grant'])} :{hb('מענק ברוטו כולל')}", ln=True, align='R')
+    pdf.cell(190, 8, txt=f"{hb('שח')} {fmt_num(data_dict['total_grant'])} :{hb('מענק ברוטו כולל')}", ln=True, align='R')
     pdf.set_text_color(0, 100, 0)
-    pdf.cell(0, 8, txt=f"{hb('שח')} {fmt_num(data_dict['exempt'])} :{hb('מענק פטור ממס')}", ln=True, align='R')
+    pdf.cell(190, 8, txt=f"{hb('שח')} {fmt_num(data_dict['exempt'])} :{hb('מענק פטור ממס')}", ln=True, align='R')
     pdf.set_text_color(150, 0, 0)
-    pdf.cell(0, 8, txt=f"{hb('שח')} {fmt_num(data_dict['taxable'])} :{hb('מענק חייב במס (לפריסה)')}", ln=True, align='R')
+    pdf.cell(190, 8, txt=f"{hb('שח')} {fmt_num(data_dict['taxable'])} :{hb('מענק חייב במס (לפריסה)')}", ln=True, align='R')
     pdf.set_text_color(0, 0, 0)
-    pdf.cell(0, 8, txt=f"{hb('שח')} {fmt_num(data_dict['savings'])} :{hb('חיסכון מס משוער בפריסה')}", ln=True, align='R')
+    pdf.cell(190, 8, txt=f"{hb('שח')} {fmt_num(data_dict['savings'])} :{hb('חיסכון מס משוער בפריסה')}", ln=True, align='R')
     
     # שורת הנטו
     pdf.ln(4)
     pdf.set_fill_color(220, 255, 220)
     pdf.set_font("ArialHeb", style="B", size=14)
     net_total = data_dict['total_grant'] - data_dict['tax_with_spread']
-    pdf.cell(0, 12, txt=f"{hb('שח')} {fmt_num(net_total)} :{hb('נטו משוער ללקוח לאחר פריסה')}", ln=True, align='R', fill=True)
+    pdf.cell(190, 12, txt=f"{hb('שח')} {fmt_num(net_total)} :{hb('נטו משוער ללקוח לאחר פריסה')}", ln=True, align='R', fill=True)
 
     # טבלת פירוט
     pdf.ln(10)
     pdf.set_fill_color(240, 240, 240)
     pdf.set_font("ArialHeb", style="B", size=10)
+    # מרכז את הטבלה ידנית מעט
+    pdf.set_x(20)
     pdf.cell(45, 10, hb("מס שנתי"), border=1, align='C', fill=True)
     pdf.cell(45, 10, hb("הכנסה כוללת"), border=1, align='C', fill=True)
     pdf.cell(45, 10, hb("חלק מענק"), border=1, align='C', fill=True)
@@ -115,20 +117,22 @@ def generate_pdf_report(data_dict):
     
     pdf.set_font("ArialHeb", size=10)
     for row in data_dict['table']:
+        pdf.set_x(20)
         pdf.cell(45, 8, f"{row['מס']}", border=1, align='C')
         pdf.cell(45, 8, f"{row['הכנסה שנתית']}", border=1, align='C')
         pdf.cell(45, 8, f"{row['חלק המענק']}", border=1, align='C')
         pdf.cell(25, 8, row['שנה'], border=1, align='C')
         pdf.ln()
 
-    # הערה משפטית מורחבת
-    pdf.set_y(-40)
+    # הערה משפטית - שימוש ברוחב קבוע למניעת השגיאה
+    pdf.set_y(-45)
+    pdf.set_x(10)
     pdf.set_font("ArialHeb", size=8)
     disclaimer_main = "הבהרה: דוח זה מהווה סימולציה ראשונית בלבד ואינו מהווה ייעוץ מס מחייב. הנתונים הסופיים ייקבעו על ידי רשויות המס."
     disclaimer_extra = "החישוב יוצא מתוך הנחה שההכנסה היחידה בשנות הפריסה היא הקצבה שהוזנה. במידה ותהיה הכנסה נוספת (משכורת, עסק וכיו''ב), חבות המס השנתית תגדל בהתאם."
     
-    pdf.multi_cell(0, 5, txt=hb(disclaimer_main), align='R')
-    pdf.multi_cell(0, 5, txt=hb(disclaimer_extra), align='R')
+    pdf.multi_cell(190, 5, txt=hb(disclaimer_main), align='R')
+    pdf.multi_cell(190, 5, txt=hb(disclaimer_extra), align='R')
 
     return bytes(pdf.output())
 
