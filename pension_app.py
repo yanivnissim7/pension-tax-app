@@ -62,7 +62,7 @@ def run_spread_calc(start_year, num_years, taxable_val, inc_now, inc_future_mo, 
         })
     return total_tax, details
 
-# --- 4. יצירת דוח PDF (מתוקן - השנה לא הפוכה) ---
+# --- 4. יצירת דוח PDF (מעודכן: בלי חתימות, עם הערה למטה) ---
 def generate_pdf_report(data_dict):
     pdf = FPDF()
     pdf.add_page()
@@ -70,7 +70,7 @@ def generate_pdf_report(data_dict):
     pdf.add_font("ArialHeb", style="B", fname="arialbd.ttf")
     pdf.set_font("ArialHeb", size=10)
 
-    # כותרת ותאריך
+    # כותרת ותאריך פלט
     pdf.cell(0, 5, txt=f"{datetime.now().strftime('%d/%m/%Y')} :{hb('תאריך פלט')}", ln=True, align='L')
     pdf.set_font("ArialHeb", style="B", size=20)
     pdf.cell(0, 15, txt=hb("דוח אופטימיזציית פריסת מענקים"), ln=True, align='C')
@@ -93,7 +93,7 @@ def generate_pdf_report(data_dict):
     pdf.set_text_color(0, 0, 0)
     pdf.cell(0, 8, txt=f"{hb('שח')} {fmt_num(data_dict['savings'])} :{hb('חיסכון מס משוער בפריסה')}", ln=True, align='R')
     
-    # שורת הנטו
+    # שורת הנטו המודגשת
     pdf.ln(4)
     pdf.set_fill_color(220, 255, 220)
     pdf.set_font("ArialHeb", style="B", size=14)
@@ -115,14 +115,14 @@ def generate_pdf_report(data_dict):
         pdf.cell(45, 8, f"{row['מס']}", border=1, align='C')
         pdf.cell(45, 8, f"{row['הכנסה שנתית']}", border=1, align='C')
         pdf.cell(45, 8, f"{row['חלק המענק']}", border=1, align='C')
-        # התיקון כאן: לא משתמשים ב-hb על השנה
         pdf.cell(25, 8, row['שנה'], border=1, align='C')
         pdf.ln()
 
-    # חתימות
-    pdf.ln(15)
-    pdf.cell(90, 10, hb("________________ :חתימת הלקוח"), align='R')
-    pdf.cell(90, 10, hb("________________ :חתימת הסוכן"), align='R')
+    # הערה משפטית בתחתית העמוד (במקום חתימות)
+    pdf.set_y(-30)
+    pdf.set_font("ArialHeb", size=8)
+    disclaimer = "הבהרה: דוח זה מהווה סימולציה ראשונית בלבד ואינו מהווה ייעוץ מס מחייב. הנתונים הסופיים ייקבעו על ידי רשויות המס בכפוף להגשת דוחות והצהרות כחוק."
+    pdf.multi_cell(0, 5, txt=hb(disclaimer), align='R')
 
     return bytes(pdf.output())
 
