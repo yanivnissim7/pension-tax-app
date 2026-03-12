@@ -23,6 +23,7 @@ def check_password():
 
 # --- 2. מנוע חישוב מס ---
 def calculate_tax_detailed(annual_income, points=2.25):
+    # מדרגות מס מעודכנות
     brackets = [(84120, 0.10), (120720, 0.14), (193800, 0.20), (269280, 0.31), (560280, 0.35), (721560, 0.47), (float('inf'), 0.50)]
     tax, prev_limit = 0, 0
     for limit, rate in brackets:
@@ -43,11 +44,10 @@ def run_spread_calc(start_year, num_years, taxable_val, inc_now, inc_future_mo, 
     annual_part = taxable_val / num_years
     total_tax = 0
     details = []
-    actual_start_year = 2026 # שנת הפרישה הנוכחית
+    actual_start_year = 2026 
     
     for i in range(num_years):
         year = start_year + i
-        # אם השנה היא שנת הפרישה, נשתמש בהכנסה הנוכחית. אחרת, עתידית.
         annual_inc = inc_now if year == actual_start_year else inc_future_mo * 12
         
         tax_on_income = calculate_tax_detailed(annual_inc, points)
@@ -63,7 +63,7 @@ def run_spread_calc(start_year, num_years, taxable_val, inc_now, inc_future_mo, 
         })
     return total_tax, details
 
-# --- 4. יצירת דוח PDF ---
+# --- 4. יצירת דוח PDF (מעודכן עם פטור/חייב) ---
 def generate_pdf_report(data_dict):
     pdf = FPDF()
     pdf.add_page()
@@ -71,6 +71,7 @@ def generate_pdf_report(data_dict):
     pdf.add_font("ArialHeb", style="B", fname="arialbd.ttf")
     pdf.set_font("ArialHeb", size=10)
 
+    # כותרת ותאריך הפקה
     pdf.cell(0, 5, txt=f"{datetime.now().strftime('%d/%m/%Y')} :{hb('תאריך פלט')}", ln=True, align='L')
     pdf.set_font("ArialHeb", style="B", size=20)
     pdf.cell(0, 15, txt=hb("דוח אופטימיזציית פריסת מענקים"), ln=True, align='C')
@@ -81,23 +82,33 @@ def generate_pdf_report(data_dict):
     pdf.cell(0, 7, txt=hb(f"תאריך פרישה: {data_dict['ret_date']}"), ln=True, align='R')
     pdf.ln(5)
     pdf.line(10, pdf.get_y(), 200, pdf.get_y())
-
     pdf.ln(5)
-    pdf.cell(0, 9, txt=f"{hb('שח')} {fmt_num(data_dict['total_grant'])} :{hb('מענק ברוטו כולל')}", ln=True, align='R')
-    pdf.cell(0, 9, txt=f"{hb('שח')} {fmt_num(data_dict['savings'])} :{hb('חיסכון מס משוער בפריסה')}", ln=True, align='R')
+
+    # נתונים כספיים - הוספת השורות שביקשת
+    pdf.set_font("ArialHeb", size=11)
+    pdf.cell(0, 8, txt=f"{hb('שח')} {fmt_num(data_dict['total_grant'])} :{hb('מענק ברוטו כולל')}", ln=True, align='R')
+    pdf.set_text_color(0, 100, 0) # צבע ירוק כהה לפטור
+    pdf.cell(0, 8, txt=f"{hb('שח')} {fmt_num(data_dict['exempt'])} :{hb('מענק פטור ממס')}", ln=True, align='R')
+    pdf.set_text_color(150, 0, 0) # צבע אדום לחייב
+    pdf.cell(0, 8, txt=f"{hb('שח')} {fmt_num(data_dict['taxable'])} :{hb('מענק חייב במס (לפריסה)')}", ln=True, align='R')
+    pdf.set_text_color(0, 0, 0) # חזרה לשחור
+    pdf.cell(0, 8, txt=f"{hb('שח')} {fmt_num(data_dict['savings'])} :{hb('חיסכון מס משוער בפריסה')}", ln=True, align='R')
     
-    pdf.ln(3)
+    # שורת הנטו המודגשת
+    pdf.ln(4)
     pdf.set_fill_color(220, 255, 220)
     pdf.set_font("ArialHeb", style="B", size=14)
     net_total = data_dict['total_grant'] - data_dict['tax_with_spread']
     pdf.cell(0, 12, txt=f"{hb('שח')} {fmt_num(net_total)} :{hb('נטו משוער ללקוח לאחר פריסה')}", ln=True, align='R', fill=True)
 
+    # טבלת פירוט
     pdf.ln(10)
+    pdf.set_fill_color(240, 240, 240)
     pdf.set_font("ArialHeb", style="B", size=10)
-    pdf.cell(45, 10, hb("מס שנתי"), border=1, align='C')
-    pdf.cell(45, 10, hb("הכנסה כוללת"), border=1, align='C')
-    pdf.cell(45, 10, hb("חלק מענק"), border=1, align='C')
-    pdf.cell(25, 10, hb("שנה"), border=1, align='C')
+    pdf.cell(45, 10, hb("מס שנתי"), border=1, align='C', fill=True)
+    pdf.cell(45, 10, hb("הכנסה כוללת"), border=1, align='C', fill=True)
+    pdf.cell(45, 10, hb("חלק מענק"), border=1, align='C', fill=True)
+    pdf.cell(25, 10, hb("שנה"), border=1, align='C', fill=True)
     pdf.ln()
     
     pdf.set_font("ArialHeb", size=10)
@@ -108,11 +119,16 @@ def generate_pdf_report(data_dict):
         pdf.cell(25, 8, hb(row['שנה']), border=1, align='C')
         pdf.ln()
 
+    # חתימות
+    pdf.ln(15)
+    pdf.cell(90, 10, hb("________________ :חתימת הלקוח"), align='R')
+    pdf.cell(90, 10, hb("________________ :חתימת הסוכן"), align='R')
+
     return bytes(pdf.output())
 
 # --- 5. ממשק המשתמש ---
 def main():
-    st.set_page_config(page_title="מחשבון פרישה מתקדם", layout="wide")
+    st.set_page_config(page_title="מחשבון פרישה מקצועי", layout="wide")
     if not check_password(): st.stop()
 
     st.markdown("<h1 style='text-align: right;'>📊 סימולטור פריסה והשוואת כדאיות</h1>", unsafe_allow_html=True)
@@ -128,6 +144,8 @@ def main():
         total_grant = st.number_input("סך המענק ברוטו", value=500000)
         seniority = st.number_input("שנות וותק", value=12.0)
         salary_for_exempt = st.number_input("שכר קובע", value=13750)
+        
+        # חישוב פטור
         exempt_val = min(total_grant, seniority * min(salary_for_exempt, 13750))
         taxable_val = total_grant - exempt_val
         
@@ -147,37 +165,35 @@ def main():
     # הצגת המלצה
     diff = tax_now - tax_next
     if diff > 100:
-        st.success(f"💡 המלצה מקצועית: עדיף להתחיל פריסה מ-{this_year + 1}. חיסכון נוסף של ₪{fmt_num(diff)} לעומת התחלה השנה.")
-        start_choice = st.radio("בחר שנת התחלה לסימולציה:", [this_year, this_year + 1], index=1)
+        st.success(f"💡 המלצה מקצועית: עדיף להתחיל פריסה מ-{this_year + 1}. חיסכון נוסף של ₪{fmt_num(diff)}")
+        start_choice = st.radio("בחר שנת התחלה:", [this_year, this_year + 1], index=1)
     else:
-        st.info(f"💡 המלצה מקצועית: במקרה זה, התחלה מ-{this_year} היא המשתלמת ביותר.")
-        start_choice = st.radio("בחר שנת התחלה לסימולציה:", [this_year, this_year + 1], index=0)
+        st.info(f"💡 המלצה מקצועית: התחלה מ-{this_year} היא המשתלמת ביותר.")
+        start_choice = st.radio("בחר שנת התחלה:", [this_year, this_year + 1], index=0)
 
-    # קביעת הנתונים להצגה לפי הבחירה
     final_tax, final_table = (tax_now, table_now) if start_choice == this_year else (tax_next, table_next)
     savings = tax_no_spread - final_tax
     net_total = total_grant - final_tax
 
-    # ויזואליזציה
     c1, c2, c3 = st.columns(3)
     c1.metric("נטו סופי ללקוח", f"₪{fmt_num(net_total)}")
     c2.metric("חיסכון מס בפריסה", f"₪{fmt_num(savings)}")
     c3.metric("סה''כ מס לתשלום", f"₪{fmt_num(final_tax)}")
     
-    st.markdown(f"### פירוט פריסה החל משנת {start_choice}")
     st.table(pd.DataFrame(final_table))
 
     if st.button("📄 הפק דוח PDF"):
         pdf_data = {
             'agent_name': agent_name, 'client_name': client_name, 'client_id': client_id, 
             'ret_date': ret_date.strftime('%d/%m/%Y'), 'total_grant': total_grant, 
+            'exempt': exempt_val, 'taxable': taxable_val, # הוספנו את המפתחות האלו
             'tax_with_spread': final_tax, 'savings': savings, 'table': final_table
         }
         try:
             pdf_bytes = generate_pdf_report(pdf_data)
             st.download_button(label="📥 הורד PDF סופי", data=pdf_bytes, file_name=f"Tax_Report_{client_name}.pdf", mime="application/pdf")
         except Exception as e:
-            st.error(f"שגיאה: {e}")
+            st.error(f"שגיאה בהפקה: {e}")
 
 if __name__ == "__main__":
     main()
