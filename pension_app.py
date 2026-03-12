@@ -62,7 +62,7 @@ def run_spread_calc(start_year, num_years, taxable_val, inc_now, inc_future_mo, 
         })
     return total_tax, details
 
-# --- 4. יצירת דוח PDF (מתוקן: תאריך ושנה לא הפוכים) ---
+# --- 4. יצירת דוח PDF (מעודכן: תאריך ושנה תקינים + הבהרה מורחבת) ---
 def generate_pdf_report(data_dict):
     pdf = FPDF()
     pdf.add_page()
@@ -70,7 +70,7 @@ def generate_pdf_report(data_dict):
     pdf.add_font("ArialHeb", style="B", fname="arialbd.ttf")
     pdf.set_font("ArialHeb", size=10)
 
-    # תאריך פלט (התאריך של היום) - מוצג משמאל
+    # תאריך פלט
     today_str = datetime.now().strftime('%d/%m/%Y')
     pdf.cell(0, 5, txt=f"{today_str} :{hb('תאריך פלט')}", ln=True, align='L')
     
@@ -80,8 +80,6 @@ def generate_pdf_report(data_dict):
     pdf.ln(5)
     pdf.set_font("ArialHeb", size=12)
     pdf.cell(0, 7, txt=hb(f"לקוח: {data_dict['client_name']} | ת.ז: {data_dict['client_id']}"), ln=True, align='R')
-    
-    # התיקון כאן: תאריך הפרישה מוצג ללא hb
     pdf.cell(0, 7, txt=f"{data_dict['ret_date']} :{hb('תאריך פרישה')}", ln=True, align='R')
     
     pdf.ln(5)
@@ -120,14 +118,17 @@ def generate_pdf_report(data_dict):
         pdf.cell(45, 8, f"{row['מס']}", border=1, align='C')
         pdf.cell(45, 8, f"{row['הכנסה שנתית']}", border=1, align='C')
         pdf.cell(45, 8, f"{row['חלק המענק']}", border=1, align='C')
-        pdf.cell(25, 8, row['שנה'], border=1, align='C') # ללא hb
+        pdf.cell(25, 8, row['שנה'], border=1, align='C')
         pdf.ln()
 
-    # הערה משפטית
-    pdf.set_y(-30)
+    # הערה משפטית מורחבת
+    pdf.set_y(-40)
     pdf.set_font("ArialHeb", size=8)
-    disclaimer = "הבהרה: דוח זה מהווה סימולציה ראשונית בלבד ואינו מהווה ייעוץ מס מחייב. הנתונים הסופיים ייקבעו על ידי רשויות המס בכפוף להגשת דוחות והצהרות כחוק."
-    pdf.multi_cell(0, 5, txt=hb(disclaimer), align='R')
+    disclaimer_main = "הבהרה: דוח זה מהווה סימולציה ראשונית בלבד ואינו מהווה ייעוץ מס מחייב. הנתונים הסופיים ייקבעו על ידי רשויות המס."
+    disclaimer_extra = "החישוב יוצא מתוך הנחה שההכנסה היחידה בשנות הפריסה היא הקצבה שהוזנה. במידה ותהיה הכנסה נוספת (משכורת, עסק וכיו''ב), חבות המס השנתית תגדל בהתאם."
+    
+    pdf.multi_cell(0, 5, txt=hb(disclaimer_main), align='R')
+    pdf.multi_cell(0, 5, txt=hb(disclaimer_extra), align='R')
 
     return bytes(pdf.output())
 
