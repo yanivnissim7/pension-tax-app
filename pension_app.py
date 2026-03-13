@@ -1,221 +1,130 @@
 import streamlit as st
 import pandas as pd
-from fpdf import FPDF
-import os
-from datetime import datetime, date
+import plotly.graph_objects as go
+from datetime import datetime
 
-# --- 1. מנגנון אבטחה ---
+# --- הגדרות אבטחה ---
 def check_password():
     if "password_correct" not in st.session_state:
         st.session_state["password_correct"] = False
-    if st.session_state["password_correct"]:
-        return True
+    if not st.session_state["password_correct"]:
+        st.markdown("<h2 style='text-align: right;'>כניסה למערכת אפקט סוכנות לביטוח 🔒</h2>", unsafe_allow_html=True)
+        pwd = st.text_input("הזן סיסמה:", type="password")
+        if st.button("התחבר"):
+            if pwd == "Effect2026": 
+                st.session_state["password_correct"] = True
+                st.rerun()
+            else:
+                st.error("סיסמה שגויה")
+        return False
+    return True
 
-    st.markdown("<h2 style='text-align: right;'>כניסה למערכת מוגנת</h2>", unsafe_allow_html=True)
-    password = st.text_input("הזן קוד גישה", type="password")
-    if st.button("התחבר"):
-        if password == "1234":
-            st.session_state["password_correct"] = True
-            st.rerun()
-        else:
-            st.error("קוד שגוי. הגישה חסומה.")
-    return False
-
-# --- 2. מנוע חישוב מס ---
-def calculate_tax_detailed(annual_income, points=2.25):
-    brackets = [(84120, 0.10), (120720, 0.14), (193800, 0.20), (269280, 0.31), (560280, 0.35), (721560, 0.47), (float('inf'), 0.50)]
-    tax, prev_limit = 0, 0
-    for limit, rate in brackets:
-        if annual_income > limit:
-            tax += (limit - prev_limit) * rate
-            prev_limit = limit
-        else:
-            tax += (annual_income - prev_limit) * rate
-            break
-    surtax = max(0, (annual_income - 721560) * 0.03)
-    return max(0, (tax + surtax) - (points * 2904))
-
-def hb(text): return str(text)[::-1] if text else ""
 def fmt_num(num): return f"{float(num):,.0f}"
 
-# --- 3. לוגיקת פריסה גנרית ---
-def run_spread_calc(start_year, num_years, taxable_val, inc_now, inc_future_mo, points):
-    annual_part = taxable_val / num_years
-    total_tax = 0
-    details = []
-    actual_start_year = 2026 
-    
-    for i in range(num_years):
-        year = start_year + i
-        annual_inc = inc_now if year == actual_start_year else inc_future_mo * 12
-        
-        tax_on_income = calculate_tax_detailed(annual_inc, points)
-        tax_with_grant = calculate_tax_detailed(annual_inc + annual_part, points)
-        annual_tax = tax_with_grant - tax_on_income
-        
-        total_tax += annual_tax
-        details.append({
-            "שנה": str(year),
-            "חלק המענק": fmt_num(annual_part),
-            "הכנסה שנתית": fmt_num(annual_inc + annual_part),
-            "מס": fmt_num(annual_tax)
-        })
-    return total_tax, details
+def calculate_income_tax(monthly_income, credit_points=2.25):
+    brackets = [(7010, 0.10), (10060, 0.14), (16150, 0.20), (22440, 0.31), (46690, 0.35), (float('inf'), 0.47)]
+    tax, prev_bracket = 0, 0
+    marginal_rate = 0.10
+    for bracket, rate in brackets:
+        if monthly_income > prev_bracket:
+            taxable_in_bracket = min(monthly_income, bracket) - prev_bracket
+            tax += taxable_in_bracket * rate
+            marginal_rate = rate
+            prev_bracket = bracket
+        else: break
+    return max(0, tax - (credit_points * 250)), marginal_rate
 
-# --- 4. יצירת דוח PDF (תיקון סוגריים בשורות נתונים וחתימה) ---
-def generate_pdf_report(data_dict):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.add_font("ArialHeb", style="", fname="arial.ttf")
-    pdf.add_font("ArialHeb", style="B", fname="arialbd.ttf")
-    
-    pdf.set_auto_page_break(auto=True, margin=15)
-    pdf.set_right_margin(15)
-    pdf.set_left_margin(15)
-
-    # תאריך פלט
-    pdf.set_font("ArialHeb", size=10)
-    today_str = datetime.now().strftime('%d/%m/%Y')
-    pdf.cell(0, 5, txt=f"{today_str} :{hb('תאריך פלט')}", ln=True, align='L')
-    
-    # כותרת
-    pdf.set_font("ArialHeb", style="B", size=20)
-    pdf.cell(0, 15, txt=hb("דוח אופטימיזציית פריסת מענקים"), ln=True, align='C')
-    
-    pdf.ln(5)
-    pdf.set_font("ArialHeb", size=12)
-    pdf.cell(0, 7, txt=hb(f"לקוח: {data_dict['client_name']} | ת.ז: {data_dict['client_id']}"), ln=True, align='R')
-    pdf.cell(0, 7, txt=f"{data_dict['ret_date']} :{hb('תאריך פרישה')}", ln=True, align='R')
-    
-    pdf.ln(5)
-    pdf.line(15, pdf.get_y(), 195, pdf.get_y())
-    pdf.ln(5)
-
-    # נתונים כספיים - תיקון סוגריים בשורה השלישית
-    pdf.set_font("ArialHeb", size=11)
-    pdf.cell(0, 8, txt=f"{hb('שח')} {fmt_num(data_dict['total_grant'])} :{hb('מענק ברוטו כולל')}", ln=True, align='R')
-    pdf.set_text_color(0, 100, 0)
-    pdf.cell(0, 8, txt=f"{hb('שח')} {fmt_num(data_dict['exempt'])} :{hb('מענק פטור ממס')}", ln=True, align='R')
-    pdf.set_text_color(150, 0, 0)
-    # תיקון סוגריים במחרוזת "מענק חייב במס (לפריסה)"
-    taxable_label = "מענק חייב במס )לפריסה("
-    pdf.cell(0, 8, txt=f"{hb('שח')} {fmt_num(data_dict['taxable'])} :{hb(taxable_label)}", ln=True, align='R')
-    pdf.set_text_color(0, 0, 0)
-    pdf.cell(0, 8, txt=f"{hb('שח')} {fmt_num(data_dict['savings'])} :{hb('חיסכון מס משוער בפריסה')}", ln=True, align='R')
-    
-    # שורת הנטו
-    pdf.ln(4)
-    pdf.set_fill_color(220, 255, 220)
-    pdf.set_font("ArialHeb", style="B", size=14)
-    net_total = data_dict['total_grant'] - data_dict['tax_with_spread']
-    pdf.cell(0, 12, txt=f"{hb('שח')} {fmt_num(net_total)} :{hb('נטו משוער ללקוח לאחר פריסה')}", ln=True, align='R', fill=True)
-
-    # טבלת פירוט
-    pdf.ln(10)
-    pdf.set_fill_color(240, 240, 240)
-    pdf.set_font("ArialHeb", style="B", size=10)
-    pdf.set_x(25)
-    pdf.cell(40, 10, hb("מס שנתי"), border=1, align='C', fill=True)
-    pdf.cell(40, 10, hb("הכנסה כוללת"), border=1, align='C', fill=True)
-    pdf.cell(40, 10, hb("חלק מענק"), border=1, align='C', fill=True)
-    pdf.cell(30, 10, hb("שנה"), border=1, align='C', fill=True)
-    pdf.ln()
-    
-    pdf.set_font("ArialHeb", size=10)
-    for row in data_dict['table']:
-        pdf.set_x(25)
-        pdf.cell(40, 8, f"{row['מס']}", border=1, align='C')
-        pdf.cell(40, 8, f"{row['הכנסה שנתית']}", border=1, align='C')
-        pdf.cell(40, 8, f"{row['חלק המענק']}", border=1, align='C')
-        pdf.cell(30, 8, row['שנה'], border=1, align='C')
-        pdf.ln()
-
-    # --- הערה משפטית ---
-    pdf.ln(10)
-    pdf.set_font("ArialHeb", size=9)
-    
-    line1 = "הבהרה משפטית: דוח זה מהווה סימולציה ראשונית בלבד המבוססת על הנתונים שהוזנו ואינו מהווה ייעוץ מס מחייב."
-    line2 = "החישוב מבוסס על ההנחה כי ההכנסה היחידה בשנות הפריסה היא הקצבה שהוזנה בסימולטור."
-    line3 = "במידה ותהיה הכנסה נוספת מכל מקור שהוא )כגון שכר עבודה, עסק, שכירות וכיו''ב(, חבות המס השנתית תגדל בהתאם."
-    line4 = "הנתונים הסופיים ייקבעו אך ורק על ידי רשויות המס בכפוף להגשת דוחות כחוק."
-
-    pdf.cell(0, 6, txt=hb(line1), ln=True, align='R')
-    pdf.cell(0, 6, txt=hb(line2), ln=True, align='R')
-    pdf.cell(0, 6, txt=hb(line3), ln=True, align='R')
-    pdf.cell(0, 6, txt=hb(line4), ln=True, align='R')
-
-    # חתימת סוכן מעודכנת
-    pdf.ln(5)
-    pdf.set_font("ArialHeb", style="B", size=10)
-    pdf.cell(0, 8, txt=f"{hb(data_dict['agent_name'])} : {hb('סוכן מטפל')}", ln=True, align='R')
-
-    return bytes(pdf.output())
-
-# --- 5. ממשק המשתמש ---
 def main():
-    st.set_page_config(page_title="מחשבון פרישה מקצועי", layout="wide")
-    if not check_password(): st.stop()
+    if not check_password(): return
 
-    st.markdown("<h1 style='text-align: right;'>📊 סימולטור פריסה והשוואת כדאיות</h1>", unsafe_allow_html=True)
-    
-    with st.sidebar:
-        st.header("פרטי פרישה")
-        agent_name = st.text_input("שם הסוכן", "יניב")
-        client_name = st.text_input("שם הלקוח", "ישראל ישראלי")
-        client_id = st.text_input("ת.ז לקוח", "")
-        ret_date = st.date_input("תאריך סיום העסקה", value=date(2026, 10, 1))
-        
-        st.divider()
-        total_grant = st.number_input("סך המענק ברוטו", value=500000)
-        seniority = st.number_input("שנות וותק", value=12.0)
-        salary_for_exempt = st.number_input("שכר קובע", value=13750)
-        
-        exempt_val = min(total_grant, seniority * min(salary_for_exempt, 13750))
-        taxable_val = total_grant - exempt_val
-        
-        st.divider()
-        points = st.number_input("נקודות זיכוי", value=2.25)
-        inc_now = st.number_input("הכנסה שנתית ב-2026 (ברוטו)", value=240000)
-        inc_future_mo = st.number_input("הכנסה חודשית עתידית צפויה", value=7000)
-        num_years = st.slider("שנות פריסה", 1, 6, 6)
+    st.set_page_config(page_title="דוח פרישה - אפקט", layout="wide")
 
-    this_year = 2026
-    tax_now, table_now = run_spread_calc(this_year, num_years, taxable_val, inc_now, inc_future_mo, points)
-    tax_next, table_next = run_spread_calc(this_year + 1, num_years, taxable_val, inc_now, inc_future_mo, points)
-    
-    tax_no_spread = (calculate_tax_detailed(inc_now + taxable_val, points) - calculate_tax_detailed(inc_now, points))
-    
-    diff = tax_now - tax_next
-    if diff > 100:
-        st.success(f"💡 המלצה מקצועית: עדיף להתחיל פריסה מ-{this_year + 1}. חיסכון נוסף של ₪{fmt_num(diff)}")
-        start_choice = st.radio("בחר שנת התחלה:", [this_year, this_year + 1], index=1)
-    else:
-        st.info(f"💡 המלצה מקצועית: התחלה מ-{this_year} היא המשתלמת ביותר.")
-        start_choice = st.radio("בחר שנת התחלה:", [this_year, this_year + 1], index=0)
-
-    final_tax, final_table = (tax_now, table_now) if start_choice == this_year else (tax_next, table_next)
-    savings = tax_no_spread - final_tax
-    net_total = total_grant - final_tax
-
-    c1, c2, c3 = st.columns(3)
-    c1.metric("נטו סופי ללקוח", f"₪{fmt_num(net_total)}")
-    c2.metric("חיסכון מס בפריסה", f"₪{fmt_num(savings)}")
-    c3.metric("סה''כ מס לתשלום", f"₪{fmt_num(final_tax)}")
-    
-    st.table(pd.DataFrame(final_table))
-
-    if st.button("📄 הפק דוח PDF"):
-        pdf_data = {
-            'agent_name': agent_name, 'client_name': client_name, 'client_id': client_id, 
-            'ret_date': ret_date.strftime('%d/%m/%Y'), 'total_grant': total_grant, 
-            'exempt': exempt_val, 'taxable': taxable_val,
-            'tax_with_spread': final_tax, 'savings': savings, 'table': final_table
+    # יישור לימין (RTL)
+    st.markdown("""<style>
+        .main, .stTabs, div[data-testid="stMetricValue"], .stMarkdown, p, h1, h2, h3, label {
+            direction: rtl; text-align: right !important;
         }
-        try:
-            pdf_bytes = generate_pdf_report(pdf_data)
-            st.download_button(label="📥 הורד PDF סופי", data=pdf_bytes, file_name=f"Tax_Report_{client_name}.pdf", mime="application/pdf")
-        except Exception as e:
-            st.error(f"שגיאה בהפקה: {e}")
+        .stTable { direction: rtl; }
+    </style>""", unsafe_allow_html=True)
+
+    with st.sidebar:
+        st.header("👤 פרטים")
+        agent = st.text_input("סוכן מטפל", value="ישראל ישראלי")
+        client = st.text_input("שם לקוח", value="")
+        c_id = st.text_input("ת.ז", value="")
+        st.divider()
+        st.header("📋 נתוני פרישה")
+        retirement_date = st.date_input("תאריך פרישה", value=datetime(2025, 12, 31))
+        expected_pension = st.number_input("קצבת ברוטו חודשית", value=18400)
+        credit_points = st.number_input("נקודות זיכוי", value=2.25)
+        seniority = st.number_input("שנות ותק", value=33.4)
+        st.divider()
+        st.header("💰 מענקים")
+        total_grant_bruto = st.number_input("סך מענק ברוטו", value=968000)
+        salary_for_exempt = st.number_input("שכר קובע לפטור", value=13750)
+        past_exempt_grants = st.number_input("פטורים בעבר", value=0)
+
+    st.markdown(f"""<div style="text-align: right; background-color: #f8f9fa; padding: 20px; border-radius: 10px; border-right: 5px solid #007bff;">
+        <h1 style="margin:0;">דוח תכנון פרישה אסטרטגי - אפקט סוכנות לביטוח בע"מ</h1>
+        <p><b>עבור:</b> {client} | <b>ת.ז:</b> {c_id} | <b>סוכן:</b> {agent}</p>
+    </div>""", unsafe_allow_html=True)
+
+    # חישובים
+    actual_exempt_now = min(total_grant_bruto, seniority * min(salary_for_exempt, 13750))
+    taxable_grant = total_grant_bruto - actual_exempt_now
+    reduction = ((actual_exempt_now + past_exempt_grants) * 1.35) * (32/seniority if seniority > 32 else 1)
+    max_mon_exemp = max(0, 976005 - reduction) / 180
+
+    st.subheader("1. אופטימיזציה")
+    pct = st.select_slider("אחוז מהפטור לקצבה:", options=range(0, 101, 10), value=0)
+    sel_exemp = max_mon_exemp * (pct / 100)
+
+    tab1, tab2, tab3 = st.tabs(["📜 קיבוע", "🔄 פריסה", "📊 כדאיות"])
+
+    with tab1:
+        t_no, _ = calculate_income_tax(expected_pension, credit_points)
+        t_yes, _ = calculate_income_tax(max(0, expected_pension - sel_exemp), credit_points)
+        c1, c2, c3 = st.columns(3)
+        c1.metric("קצבה נטו", f"₪{fmt_num(expected_pension - t_yes)}", f"+₪{fmt_num(t_no - t_yes)}")
+        c2.metric("מס חודשי", f"₪{fmt_num(t_yes)}")
+        c3.metric("הון פטור נותר", f"₪{fmt_num((max_mon_exemp*180) * (1-pct/100))}")
+
+    with tab2:
+        is_after_oct = retirement_date.month >= 10
+        start_yr = st.selectbox("שנת תחילת פריסה:", [retirement_date.year, retirement_date.year + 1], index=1 if is_after_oct else 0)
+        max_y = 6 if (is_after_oct or start_yr == retirement_date.year) else 5
+        num_y = st.slider("שנות פריסה:", 1, max_y, max_y)
+        
+        ann_grant = taxable_grant / num_y
+        total_tax_spread = 0
+        rows = []
+        for i in range(num_y):
+            yr = start_yr + i
+            p_m = 12 if (yr != retirement_date.year) else (12 - retirement_date.month)
+            t_p, _ = calculate_income_tax(max(0, expected_pension - sel_exemp), credit_points)
+            t_all, m_rate = calculate_income_tax(max(0, expected_pension + (ann_grant/12) - sel_exemp), credit_points)
+            tax_on_g = (t_all - t_p) * 12
+            total_tax_spread += tax_on_g
+            rows.append({"שנה": yr, "ברוטו שנתי": (expected_pension * p_m) + ann_grant, "מס שנתי": t_all * 12, "נטו שנתי": ((expected_pension * p_m) + ann_grant) - (t_all * 12), "מדרגה": f"{m_rate*100:.0f}%"})
+        
+        st.table(pd.DataFrame(rows))
+        
+        # תיקון החישוב שגרם למינוס:
+        tax_no_spread = taxable_grant * 0.47
+        saving = tax_no_spread - total_tax_spread
+        
+        col_a, col_b, col_c = st.columns(3)
+        col_a.error(f"מס ללא פריסה: ₪{fmt_num(tax_no_spread)}")
+        col_b.warning(f"מס בפריסה: ₪{fmt_num(total_tax_spread)}")
+        col_c.success(f"חיסכון נקי: ₪{fmt_num(saving)}")
+
+    with tab3:
+        tax_save_15 = (t_no - calculate_income_tax(max(0, expected_pension - max_mon_exemp), credit_points)[0]) * 180
+        fig = go.Figure(data=[
+            go.Bar(name='הון פטור', x=['השוואה'], y=[max_mon_exemp*180], marker_color='#2ecc71'),
+            go.Bar(name='חיסכון במס (15 שנה)', x=['השוואה'], y=[tax_save_15], marker_color='#3498db')
+        ])
+        st.plotly_chart(fig, use_container_width=True)
 
 if __name__ == "__main__":
     main()
